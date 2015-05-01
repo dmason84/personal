@@ -1,6 +1,10 @@
 package uk.co.douglasmason.parkrun;
 
-import java.net.*;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.LinkedList;
 import java.io.*;
 
@@ -14,19 +18,29 @@ import uk.co.douglasmason.parkrun.athlete.Result;
 
 public class Parkrun {
 
-	public static void main(String[] args) throws IOException {
-		LinkedList<Athlete> athletes = new LinkedList<Athlete>();
+	public static DateFormat dateFormatParkrun = new SimpleDateFormat("dd/MM/yyyy");
+	private static DateFormat dateFormatCsv = new SimpleDateFormat("MM/dd/yyyy");
+	private static LinkedList<Athlete> athletes = new LinkedList<Athlete>();
+	private static Date firstRun = new Date();
+	
+	public static void main(String[] args) throws IOException, ParseException {
 		for (String s : args) {
-			System.out.println("Getting data for athlete: " + s);
 			Athlete athlete = new Athlete(s);
 			getAthleteData(athlete);
 			athletes.add(athlete);
-			System.out.println("Successfully retrieved " + athlete.getName() + " (" + athlete.getResults().size() + " runs)");
-			System.out.println();
+			Date athleteFirstRun = dateFormatParkrun.parse(athlete.getResults().getLast().getRunDate());
+			if (athleteFirstRun.compareTo(firstRun) < 0) {
+				firstRun = athleteFirstRun;
+			}			
 		}
+		System.out.println();
+		System.out.println("First run: " + dateFormatParkrun.format(firstRun));
+		System.out.println();
+		outputCsv();
 	}
 
-	public static void getAthleteData(Athlete athlete) throws IOException {
+	private static void getAthleteData(Athlete athlete) throws IOException {
+		System.out.println("Getting data for athlete: " + athlete.getId());
 		// Construct the athlete URL for all results
 		String url = "http://www.parkrun.org.uk/results/athleteeventresultshistory/?athleteNumber="
 				+ athlete.getId() + "&eventNumber=0";
@@ -72,6 +86,31 @@ public class Parkrun {
 
 				athlete.addResult(result);
 			}
+		}
+		System.out.println("Successfully retrieved " + athlete.getName() + " (" + athlete.getResults().size() + " runs since " + athlete.getResults().getLast().getRunDate() + ")");
+	}
+	
+	private static void outputCsv() throws ParseException {
+		String athleteHeader = "Date";
+		String dataTypeHeader = "date";
+		for (Athlete athlete : athletes) {
+			athleteHeader += "," + athlete.getName();
+			dataTypeHeader += ",number"; 
+		}
+		System.out.println(athleteHeader);
+		System.out.println(dataTypeHeader);
+		Calendar runDate = Calendar.getInstance();
+		// Loop through every Saturday since the first parkrun
+		runDate.setTime(firstRun);
+		Calendar currentDate = Calendar.getInstance();
+		while (runDate.compareTo(currentDate) < 0) {
+			String row = dateFormatCsv.format(runDate.getTime());
+			// Loop through athletes and find out how many runs they've done by this date
+			for (Athlete athlete : athletes) {
+				row += "," + athlete.getRunsDoneByDate(runDate);
+			}
+			System.out.println(row);
+			runDate.add(Calendar.DATE, 7);
 		}
 	}
 }
